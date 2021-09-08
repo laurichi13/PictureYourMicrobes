@@ -1,0 +1,84 @@
+# Instalar última version de qiime2
+
+wget https://data.qiime2.org/distro/core/qiime2-2021.4-py38-linux-conda.yml
+conda env create -n qiime2-2021.4 --file qiime2-2021.4-py38-linux-conda.yml
+
+#Optional clean-up
+rm qiime2-2021.4-py38-linux-conda.yml
+
+conda activate qiime2-2021.4 
+
+qiime tools import \
+  --type 'SampleData[PairedEndSequencesWithQuality]' \
+  --input-path manifiest.csv \
+  --output-path demux.qza \
+  --input-format PairedEndFastqManifestPhred33 \
+
+qiime demux summarize \
+  --i-data demux.qza \
+  --o-visualization demux.qzv
+  
+  qiime dada2 denoise-paired \
+  --i-demultiplexed-seqs demux.qza \
+  --p-n-threads 6 \
+  --p-trim-left-f 6 \
+  --p-trim-left-r 6 \
+  --p-trunc-len-f 220 \
+  --p-trunc-len-r 220 \
+  --o-table table.qza \
+  --o-representative-sequences rep-seqs.qza \
+  --o-denoising-stats denoising-stats.qza
+  
+  qiime feature-table summarize \
+  --i-table table.qza \
+  --o-visualization table.qzv \
+  --m-sample-metadata-file metadata-PYM.tsv
+
+qiime feature-table tabulate-seqs \
+  --i-data rep-seqs.qza \
+  --o-visualization rep-seqs.qzv
+
+qiime metadata tabulate \
+  --m-input-file denoising-stats.qza \
+  --o-visualization denoising-stats.qzv
+  
+  qiime phylogeny align-to-tree-mafft-fasttree \
+  --i-sequences rep-seqs.qza \
+  --o-alignment aligned-rep-seqs.qza \
+  --o-masked-alignment masked-aligned-rep-seqs.qza \
+  --o-tree unrooted-tree.qza \
+  --o-rooted-tree rooted-tree.qza
+  
+  qiime diversity core-metrics-phylogenetic \
+  --i-phylogeny rooted-tree.qza \
+  --i-table table.qza \
+  --p-sampling-depth 50344 \
+  --m-metadata-file metadata-PYM.tsv \
+  --output-dir core-metrics-results
+  
+  #Descargar classifier 
+  wget https://data.qiime2.org/2021.4/common/silva-138-99-nb-classifier.qza
+  
+  qiime feature-classifier classify-sklearn \
+  --i-classifier silva-138-99-nb-classifier.qza \
+  --i-reads rep-seqs.qza \
+  --o-classification taxonomy.qza
+
+qiime metadata tabulate \
+  --m-input-file taxonomy.qza \
+  --o-visualization taxonomy.qzv
+
+qiime taxa barplot \
+  --i-table table.qza \
+  --i-taxonomy taxonomy.qza \
+  --m-metadata-file metadata-PYM.tsv \
+  --o-visualization taxa-bar-plots.qzv
+  
+# Función taxa-collapse a nivel de género 
+qiime taxa collapse \
+ --i-table table.qza \
+ --i-taxonomy taxonomy.qza \
+ --p-level 6 \
+ --o-collapsed-table collapsed.qza
+  
+  
